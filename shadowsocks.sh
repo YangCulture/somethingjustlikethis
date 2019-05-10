@@ -228,10 +228,6 @@ download_files(){
         exit 1
     fi
     # Download Shadowsocks init script
-    if check_sys packageManager yum; 
-    fi
-}
-
 # Config shadowsocks
 config_shadowsocks(){
     cat > /etc/shadowsocks.json<<-EOF
