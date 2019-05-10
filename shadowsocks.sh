@@ -146,8 +146,8 @@ pre_install(){
     fi
     # Set shadowsocks config password
     echo "Please enter password for shadowsocks-python"
-    read -p "(Default password: whatareyoudoing):" shadowsockspwd
-    [ -z "${shadowsockspwd}" ] && shadowsockspwd="whatareyoudoing"
+    read -p "(Default password: baidu.com):" shadowsockspwd
+    [ -z "${shadowsockspwd}" ] && shadowsockspwd="baidu.com"
     echo
     echo "---------------------------"
     echo "password = ${shadowsockspwd}"
@@ -222,12 +222,6 @@ download_files(){
         echo -e "[${red}Error${plain}] Failed to download ${libsodium_file}.tar.gz!"
         exit 1
     fi
-    # Download Shadowsocks file
-    if ! wget --no-check-certificate -O shadowsocks-master.zip https://github.com/shadowsocks/shadowsocks/archive/master.zip; then
-        echo -e "[${red}Error${plain}] Failed to download shadowsocks python file!"
-        exit 1
-    fi
-    # Download Shadowsocks init script
 # Config shadowsocks
 config_shadowsocks(){
     cat > /etc/shadowsocks.json<<-EOF
@@ -315,7 +309,7 @@ install(){
         /etc/init.d/shadowsocks start
     else
         echo
-        echo -e "[${red}Error${plain}] Shadowsocks install failed! please visit https://www.baidu.com and contact."
+        echo -e "[${red}Error${plain}] Shadowsocks install failed! please visit https://teddysun.com/342.html and contact."
         install_cleanup
         exit 1
     fi
@@ -328,8 +322,8 @@ install(){
     echo -e "Your Password         : \033[41;37m ${shadowsockspwd} \033[0m"
     echo -e "Your Encryption Method: \033[41;37m ${shadowsockscipher} \033[0m"
     echo
-    echo "Welcome to visit:https://www.github.com"
-    echo "Enjoy it my fridend!"
+    echo "Welcome to visit:https://teddysun.com/342.html"
+    echo "Enjoy it!"
     echo
 }
 
