@@ -1,14 +1,9 @@
 #!/usr/bin/env bash
 PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:~/bin
 clear
-echo
-echo
 libsodium_file="libsodium-1.0.17"
 libsodium_url="https://github.com/jedisct1/libsodium/releases/download/1.0.17/libsodium-1.0.17.tar.gz"
-
-# Current folder
 cur_dir=`pwd`
-# Stream Ciphers
 ciphers=(
 aes-256-gcm
 aes-192-gcm
@@ -27,19 +22,13 @@ chacha20-ietf
 chacha20
 rc4-md5
 )
-# Color
 red='\033[0;31m'
 green='\033[0;32m'
 yellow='\033[0;33m'
 plain='\033[0m'
-
-# Make sure only root can run our script
-[[ $EUID -ne 0 ]] && echo -e "[${red}Error${plain}] This script must be run as root!" && exit 1
-
-# Disable selinux
+# Stream Ciphers
 disable_selinux(){
     if [ -s /etc/selinux/config ] && grep 'SELINUX=enforcing' /etc/selinux/config; then
-        sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config
         setenforce 0
     fi
 }
@@ -55,21 +44,9 @@ check_sys(){
     if [[ -f /etc/redhat-release ]]; then
         release="centos"
         systemPackage="yum"
-    elif grep -Eqi "debian|raspbian" /etc/issue; then
-        release="debian"
-        systemPackage="apt"
-    elif grep -Eqi "ubuntu" /etc/issue; then
-        release="ubuntu"
-        systemPackage="apt"
     elif grep -Eqi "centos|red hat|redhat" /etc/issue; then
         release="centos"
         systemPackage="yum"
-    elif grep -Eqi "debian|raspbian" /proc/version; then
-        release="debian"
-        systemPackage="apt"
-    elif grep -Eqi "ubuntu" /proc/version; then
-        release="ubuntu"
-        systemPackage="apt"
     elif grep -Eqi "centos|red hat|redhat" /proc/version; then
         release="centos"
         systemPackage="yum"
@@ -118,7 +95,6 @@ centosversion(){
 # Get public IP address
 get_ip(){
     local IP=$( ip addr | egrep -o '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | egrep -v "^192\.168|^172\.1[6-9]\.|^172\.2[0-9]\.|^172\.3[0-2]\.|^10\.|^127\.|^255\.|^0\." | head -n 1 )
-    [ -z ${IP} ] && IP=$( wget -qO- -t1 -T2 ipv4.icanhazip.com )
     [ -z ${IP} ] && IP=$( wget -qO- -t1 -T2 ipinfo.io/ip )
     [ ! -z ${IP} ] && echo ${IP} || echo
 }
@@ -132,23 +108,10 @@ get_char(){
     stty echo
     stty $SAVEDSTTY
 }
-
-# Pre-installation settings
-pre_install(){
-    if check_sys packageManager yum || check_sys packageManager apt; then
-        # Not support CentOS 5
-        if centosversion 5; then
-            echo -e "$[{red}Error${plain}] Not supported CentOS 5, please change to CentOS 6+/Debian 7+/Ubuntu 12+ and try again."
-            exit 1
-        fi
-    else
-        echo -e "[${red}Error${plain}] Your OS is not supported. please change OS to CentOS/Debian/Ubuntu and try again."
-        exit 1
-    fi
     # Set shadowsocks config password
-    echo "Please enter password for shadowsocks-python"
-    read -p "(Default password: baidu.com):" shadowsockspwd
-    [ -z "${shadowsockspwd}" ] && shadowsockspwd="baidu.com"
+    echo "Please enter your shadowsocks password la"
+    read -p "(Default password:${shadowsockspwd}):" shadowsockspwd
+    [ -z "${shadowsockspwd}" ] && shadowsockspwd="${shadowsockspwd}"
     echo
     echo "---------------------------"
     echo "password = ${shadowsockspwd}"
@@ -158,11 +121,10 @@ pre_install(){
     while true
     do
     dport=$(shuf -i 9000-19999 -n 1)
-    echo "Please enter a port for shadowsocks-python [1-65535]"
+    echo "Please enter a shadowsocks port [1-65535]"
     read -p "(Default port: ${dport}):" shadowsocksport
     [ -z "$shadowsocksport" ] && shadowsocksport=${dport}
     expr ${shadowsocksport} + 1 &>/dev/null
-    if [ $? -eq 0 ]; then
         if [ ${shadowsocksport} -ge 1 ] && [ ${shadowsocksport} -le 65535 ] && [ ${shadowsocksport:0:1} != 0 ]; then
             echo
             echo "---------------------------"
@@ -171,10 +133,7 @@ pre_install(){
             echo
             break
         fi
-    fi
-    echo -e "[${red}Error${plain}] Please enter a correct number [1-65535]"
-    done
-
+        done
     # Set shadowsocks config stream ciphers
     while true
     do
@@ -186,14 +145,6 @@ pre_install(){
     read -p "Which cipher you'd select(Default: ${ciphers[0]}):" pick
     [ -z "$pick" ] && pick=1
     expr ${pick} + 1 &>/dev/null
-    if [ $? -ne 0 ]; then
-        echo -e "[${red}Error${plain}] Please enter a number"
-        continue
-    fi
-    if [[ "$pick" -lt 1 || "$pick" -gt ${#ciphers[@]} ]]; then
-        echo -e "[${red}Error${plain}] Please enter a number between 1 and ${#ciphers[@]}"
-        continue
-    fi
     shadowsockscipher=${ciphers[$pick-1]}
     echo
     echo "---------------------------"
@@ -204,7 +155,7 @@ pre_install(){
     done
 
     echo
-    echo "Press any key to start...or Press Ctrl+C to cancel"
+    echo "Press any key to start.l"
     char=`get_char`
     # Install necessary dependencies
     if check_sys packageManager yum; then
