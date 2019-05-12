@@ -214,8 +214,6 @@ firewall_set(){
         else
             echo -e "[${yellow}Warning${plain}] iptables looks like shutdown or not installed, please manually set it if necessary."
         fi
-}
-
 # Install Shadowsocks
 install(){
     # Install libsodium
