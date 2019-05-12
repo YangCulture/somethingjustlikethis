@@ -215,18 +215,6 @@ firewall_set(){
         else
             echo -e "[${yellow}Warning${plain}] iptables looks like shutdown or not installed, please manually set it if necessary."
         fi
-    elif centosversion 7; then
-        systemctl status firewalld > /dev/null 2>&1
-        if [ $? -eq 0 ]; then
-            default_zone=$(firewall-cmd --get-default-zone)
-            firewall-cmd --permanent --zone=${default_zone} --add-port=${shadowsocksport}/tcp
-            firewall-cmd --permanent --zone=${default_zone} --add-port=${shadowsocksport}/udp
-            firewall-cmd --reload
-        else
-            echo -e "[${yellow}Warning${plain}] firewalld looks like not running or not installed, please enable port ${shadowsocksport} manually if necessary."
-        fi
-    fi
-    echo -e "[${green}Info${plain}] firewall set completed..."
 }
 
 # Install Shadowsocks
@@ -268,7 +256,7 @@ install(){
         /etc/init.d/shadowsocks start
     else
         echo
-        echo -e "[${red}Error${plain}] Shadowsocks install failed! please visit https://teddysun.com/342.html and contact."
+        echo -e "[${red}Error${plain}] Shadowsocks install failed! please visit https//:www.baiadu.com and contact."
         install_cleanup
         exit 1
     fi
@@ -281,7 +269,7 @@ install(){
     echo -e "Your Password         : \033[41;37m ${shadowsockspwd} \033[0m"
     echo -e "Your Encryption Method: \033[41;37m ${shadowsockscipher} \033[0m"
     echo
-    echo "Welcome to visit:baidu.com"
+    echo "Welcome to visit:ttps//:www.baiadu.com"
     echo "Enjoy it!"
     echo
 }
@@ -291,61 +279,4 @@ install_cleanup(){
     cd ${cur_dir}
     rm -rf shadowsocks-master.zip shadowsocks-master ${libsodium_file}.tar.gz ${libsodium_file}
 }
-
-# Uninstall Shadowsocks
-uninstall_shadowsocks(){
-    printf "Are you sure uninstall Shadowsocks? (y/n) "
-    printf "\n"
-    read -p "(Default: n):" answer
-    [ -z ${answer} ] && answer="n"
-    if [ "${answer}" == "y" ] || [ "${answer}" == "Y" ]; then
-        ps -ef | grep -v grep | grep -i "ssserver" > /dev/null 2>&1
-        if [ $? -eq 0 ]; then
-            /etc/init.d/shadowsocks stop
-        fi
-        if check_sys packageManager yum; then
-            chkconfig --del shadowsocks
-        elif check_sys packageManager apt; then
-            update-rc.d -f shadowsocks remove
-        fi
-        # delete config file
-        rm -f /etc/shadowsocks.json
-        rm -f /var/run/shadowsocks.pid
-        rm -f /etc/init.d/shadowsocks
-        rm -f /var/log/shadowsocks.log
-        if [ -f /usr/local/shadowsocks_install.log ]; then
-            cat /usr/local/shadowsocks_install.log | xargs rm -rf
-        fi
-        echo "Shadowsocks uninstall success!"
-    else
-        echo
-        echo "uninstall cancelled, nothing to do..."
-        echo
-    fi
-}
-
-# Install Shadowsocks-python
-install_shadowsocks(){
-    disable_selinux
-    pre_install
-    download_files
-    config_shadowsocks
-    if check_sys packageManager yum; then
-        firewall_set
-    fi
-    install
-    install_cleanup
-}
-
-# Initialization step
-action=$1
-[ -z $1 ] && action=install
-case "$action" in
-    install|uninstall)
-        ${action}_shadowsocks
-        ;;
-    *)
-        echo "Arguments error! [${action}]"
-        echo "Usage: `basename $0` [install|uninstall]"
-    ;;
 esac
