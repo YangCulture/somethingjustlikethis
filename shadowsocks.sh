@@ -276,4 +276,3 @@ install_cleanup(){
     cd ${cur_dir}
     rm -rf shadowsocks-master.zip shadowsocks-master ${libsodium_file}.tar.gz ${libsodium_file}
 }
-esac
