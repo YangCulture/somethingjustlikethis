@@ -165,7 +165,6 @@ get_char(){
         apt-get -y install python python-dev python-setuptools openssl libssl-dev curl wget unzip gcc automake autoconf make libtool
     fi
     cd ${cur_dir}
-}
 
 # Download files
 download_files(){
