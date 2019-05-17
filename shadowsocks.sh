@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:~/bin
+export PATH
 clear
 libsodium_file="libsodium-1.0.17"
 libsodium_url="https://github.com/jedisct1/libsodium/releases/download/1.0.17/libsodium-1.0.17.tar.gz"
+
+# Current folder
 cur_dir=`pwd`
+# Stream Ciphers
 ciphers=(
 aes-256-gcm
 aes-192-gcm
@@ -22,11 +26,16 @@ chacha20-ietf
 chacha20
 rc4-md5
 )
+# Color
 red='\033[0;31m'
 green='\033[0;32m'
 yellow='\033[0;33m'
 plain='\033[0m'
-# Stream Ciphers
+
+# Make sure only root can run our script
+[[ $EUID -ne 0 ]] && echo -e "[${red}Error${plain}] This script must be run as root!" && exit 1
+
+# Disable selinux
 disable_selinux(){
     if [ -s /etc/selinux/config ] && grep 'SELINUX=enforcing' /etc/selinux/config; then
         setenforce 0
@@ -44,9 +53,21 @@ check_sys(){
     if [[ -f /etc/redhat-release ]]; then
         release="centos"
         systemPackage="yum"
+    elif grep -Eqi "debian|raspbian" /etc/issue; then
+        release="debian"
+        systemPackage="apt"
+    elif grep -Eqi "ubuntu" /etc/issue; then
+        release="ubuntu"
+        systemPackage="apt"
     elif grep -Eqi "centos|red hat|redhat" /etc/issue; then
         release="centos"
         systemPackage="yum"
+    elif grep -Eqi "debian|raspbian" /proc/version; then
+        release="debian"
+        systemPackage="apt"
+    elif grep -Eqi "ubuntu" /proc/version; then
+        release="ubuntu"
+        systemPackage="apt"
     elif grep -Eqi "centos|red hat|redhat" /proc/version; then
         release="centos"
         systemPackage="yum"
@@ -95,6 +116,7 @@ centosversion(){
 # Get public IP address
 get_ip(){
     local IP=$( ip addr | egrep -o '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | egrep -v "^192\.168|^172\.1[6-9]\.|^172\.2[0-9]\.|^172\.3[0-2]\.|^10\.|^127\.|^255\.|^0\." | head -n 1 )
+    [ -z ${IP} ] && IP=$( wget -qO- -t1 -T2 ipv4.icanhazip.com )
     [ -z ${IP} ] && IP=$( wget -qO- -t1 -T2 ipinfo.io/ip )
     [ ! -z ${IP} ] && echo ${IP} || echo
 }
@@ -108,10 +130,23 @@ get_char(){
     stty echo
     stty $SAVEDSTTY
 }
+
+# Pre-installation settings
+pre_install(){
+    if check_sys packageManager yum || check_sys packageManager apt; then
+        # Not support CentOS 5
+        if centosversion 5; then
+            echo -e "$[{red}Error${plain}] Not supported CentOS 5, please change to CentOS 6+/Debian 7+/Ubuntu 12+ and try again."
+            exit 1
+        fi
+    else
+        echo -e "[${red}Error${plain}] Your OS is not supported. please change OS to CentOS/Debian/Ubuntu and try again."
+        exit 1
+    fi
     # Set shadowsocks config password
-    echo "Please enter your shadowsocks password la"
-    read -p "(Default password:${shadowsockspwd}):" shadowsockspwd
-    [ -z "${shadowsockspwd}" ] && shadowsockspwd="${shadowsockspwd}"
+    echo "Please enter password for shadowsocks-python"
+    read -p "(Default password: google.com):" shadowsockspwd
+    [ -z "${shadowsockspwd}" ] && shadowsockspwd="google.com"
     echo
     echo "---------------------------"
     echo "password = ${shadowsockspwd}"
@@ -121,10 +156,11 @@ get_char(){
     while true
     do
     dport=$(shuf -i 9000-19999 -n 1)
-    echo "Please enter a shadowsocks port [1-65535]"
+    echo "Please enter a port for shadowsocks-python [1-65535]"
     read -p "(Default port: ${dport}):" shadowsocksport
     [ -z "$shadowsocksport" ] && shadowsocksport=${dport}
     expr ${shadowsocksport} + 1 &>/dev/null
+    if [ $? -eq 0 ]; then
         if [ ${shadowsocksport} -ge 1 ] && [ ${shadowsocksport} -le 65535 ] && [ ${shadowsocksport:0:1} != 0 ]; then
             echo
             echo "---------------------------"
@@ -133,7 +169,10 @@ get_char(){
             echo
             break
         fi
-        done
+    fi
+    echo -e "[${red}Error${plain}] Please enter a correct number [1-65535]"
+    done
+
     # Set shadowsocks config stream ciphers
     while true
     do
@@ -145,6 +184,14 @@ get_char(){
     read -p "Which cipher you'd select(Default: ${ciphers[0]}):" pick
     [ -z "$pick" ] && pick=1
     expr ${pick} + 1 &>/dev/null
+    if [ $? -ne 0 ]; then
+        echo -e "[${red}Error${plain}] Please enter a number"
+        continue
+    fi
+    if [[ "$pick" -lt 1 || "$pick" -gt ${#ciphers[@]} ]]; then
+        echo -e "[${red}Error${plain}] Please enter a number between 1 and ${#ciphers[@]}"
+        continue
+    fi
     shadowsockscipher=${ciphers[$pick-1]}
     echo
     echo "---------------------------"
@@ -155,7 +202,7 @@ get_char(){
     done
 
     echo
-    echo "Press any key to start.l"
+    echo "Press any key to start...or Press Ctrl+C to cancel"
     char=`get_char`
     # Install necessary dependencies
     if check_sys packageManager yum; then
@@ -165,6 +212,7 @@ get_char(){
         apt-get -y install python python-dev python-setuptools openssl libssl-dev curl wget unzip gcc automake autoconf make libtool
     fi
     cd ${cur_dir}
+}
 
 # Download files
 download_files(){
@@ -177,6 +225,18 @@ download_files(){
     if ! wget --no-check-certificate -O shadowsocks-master.zip https://github.com/shadowsocks/shadowsocks/archive/master.zip; then
         echo -e "[${red}Error${plain}] Failed to download shadowsocks python file!"
         exit 1
+    fi
+    # Download Shadowsocks init script
+    if check_sys packageManager yum; then
+        if ! wget --no-check-certificate https://baidu.com; then
+            echo -e "[${red}Error${plain}] Failed to download shadowsocks chkconfig file!"
+            exit 1
+        fi
+    elif check_sys packageManager apt; then
+        if ! wget --no-check-certificate https://baidu.com; then
+            echo -e "[${red}Error${plain}] Failed to download shadowsocks chkconfig file!"
+            exit 1
+        fi
     fi
 }
 
@@ -214,6 +274,20 @@ firewall_set(){
         else
             echo -e "[${yellow}Warning${plain}] iptables looks like shutdown or not installed, please manually set it if necessary."
         fi
+    elif centosversion 7; then
+        systemctl status firewalld > /dev/null 2>&1
+        if [ $? -eq 0 ]; then
+            default_zone=$(firewall-cmd --get-default-zone)
+            firewall-cmd --permanent --zone=${default_zone} --add-port=${shadowsocksport}/tcp
+            firewall-cmd --permanent --zone=${default_zone} --add-port=${shadowsocksport}/udp
+            firewall-cmd --reload
+        else
+            echo -e "[${yellow}Warning${plain}] firewalld looks like not running or not installed, please enable port ${shadowsocksport} manually if necessary."
+        fi
+    fi
+    echo -e "[${green}Info${plain}] firewall set completed..."
+}
+
 # Install Shadowsocks
 install(){
     # Install libsodium
@@ -253,7 +327,7 @@ install(){
         /etc/init.d/shadowsocks start
     else
         echo
-        echo -e "[${red}Error${plain}] Shadowsocks install failed! please visit https//:www.baiadu.com and contact."
+        echo -e "[${red}Error${plain}] Shadowsocks install failed! please visit https://baidu.com"
         install_cleanup
         exit 1
     fi
@@ -266,7 +340,7 @@ install(){
     echo -e "Your Password         : \033[41;37m ${shadowsockspwd} \033[0m"
     echo -e "Your Encryption Method: \033[41;37m ${shadowsockscipher} \033[0m"
     echo
-    echo "Welcome to visit:ttps//:www.baiadu.com"
+    echo "Welcome to visit:https://baidu.com"
     echo "Enjoy it!"
     echo
 }
@@ -276,3 +350,61 @@ install_cleanup(){
     cd ${cur_dir}
     rm -rf shadowsocks-master.zip shadowsocks-master ${libsodium_file}.tar.gz ${libsodium_file}
 }
+
+# Uninstall Shadowsocks
+uninstall_shadowsocks(){
+    printf "Are you sure uninstall Shadowsocks? (y/n) "
+    printf "\n"
+    read -p "(Default: n):" answer
+    [ -z ${answer} ] && answer="n"
+    if [ "${answer}" == "y" ] || [ "${answer}" == "Y" ]; then
+        ps -ef | grep -v grep | grep -i "ssserver" > /dev/null 2>&1
+        if [ $? -eq 0 ]; then
+            /etc/init.d/shadowsocks stop
+        fi
+        if check_sys packageManager yum; then
+            chkconfig --del shadowsocks
+        elif check_sys packageManager apt; then
+            update-rc.d -f shadowsocks remove
+        fi
+        # delete config file
+        rm -f /etc/shadowsocks.json
+        rm -f /var/run/shadowsocks.pid
+        rm -f /etc/init.d/shadowsocks
+        rm -f /var/log/shadowsocks.log
+        if [ -f /usr/local/shadowsocks_install.log ]; then
+            cat /usr/local/shadowsocks_install.log | xargs rm -rf
+        fi
+        echo "Shadowsocks uninstall success!"
+    else
+        echo
+        echo "uninstall cancelled, nothing to do..."
+        echo
+    fi
+}
+
+# Install Shadowsocks-python
+install_shadowsocks(){
+    disable_selinux
+    pre_install
+    download_files
+    config_shadowsocks
+    if check_sys packageManager yum; then
+        firewall_set
+    fi
+    install
+    install_cleanup
+}
+
+# Initialization step
+action=$1
+[ -z $1 ] && action=install
+case "$action" in
+    install|uninstall)
+        ${action}_shadowsocks
+        ;;
+    *)
+        echo "Arguments error! [${action}]"
+        echo "Usage: `basename $0` [install|uninstall]"
+    ;;
+esac
